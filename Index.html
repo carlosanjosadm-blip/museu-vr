@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Museu Game Ciência VR - Neon Monumental</title>
+    
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+
+    <script>
+        // ==========================================
+        // DADOS CURATORIAIS (Atualizados e Sem Caracteres Especiais)
+        // ==========================================
+        var conteudosMuseu = [
+            {
+                sala: "1a Geração", ano: "1972-1978", cor: "#ff7b00", tipo: "arcade",
+                esq: { titulo: "Magnavox Odyssey", texto: "Lancado em 1972, o primeiro console de videogame lancado em todo o mundo. Precursor da interatividade com a TV." },
+                dir: { titulo: "Odyssey 400", texto: "Lancado em 1976. Tinha como diferencial os ineditos cartuchos de pontuacao automatica na tela. Valorizava a interacao familiar." }
+            },
+            {
+                sala: "2a Geracao", ano: "1976-1984", cor: "#ff2d55", tipo: "cartucho",
+                esq: { titulo: "Atari 2600", texto: "Lancado em 1982 (no Brasil). Emerge como simbolo cultural. Nos seus jogos educativos e valorizado o exercicio do raciocinio logico." },
+                dir: { titulo: "Odyssey 2", texto: "De 1978. Otima opcao de entretenimento, educacao e lazer para as familias, pois seus jogos estimulavam a coordenacao motora." }
+            },
+            {
+                sala: "3a Geracao", ano: "1983-1990", cor: "#ff00a0", tipo: "cartucho",
+                esq: { titulo: "NES / Famicom", texto: "Lancado em 1983. Fez sucesso com jogos que se tornaram referencia, como Mario Bros, Zelda e Megaman." },
+                dir: { titulo: "Master System", texto: "De 1989. Popularizou-se no Brasil com jogos inspirados em desenhos animados, proporcionando desenvolvimento cognitivo." }
+            },
+            {
+                sala: "4a Geracao", ano: "1987-1996", cor: "#d400ff", tipo: "cartucho",
+                esq: { titulo: "Super Nintendo", texto: "De 1990. Destacou-se pela qualidade de graficos e sons 3D. Seus jogos promoviam habilidades cognitivas no ambiente familiar." },
+                dir: { titulo: "Mega Drive", texto: "De 1990. Sucesso pelo seu rapido processador. Seus games valorizavam a diversao e o desenvolvimento de habilidades." }
+            },
+            {
+                sala: "5a Geracao", ano: "1993-1999", cor: "#7b2fff", tipo: "disco",
+                esq: { titulo: "PlayStation 1", texto: "Lancado em 1994 pela Sony, um novo player que chacoalhou o mercado de games de forma inesquecivel." },
+                dir: { titulo: "Nintendo 64", texto: "Lancado em 1996. Parecia ser a promessa da geracao apos a SEGA nao se consolidar com o Saturn." }
+            },
+            {
+                sala: "6a Geracao", ano: "1998-2004", cor: "#2d6bff", tipo: "disco",
+                esq: { titulo: "PlayStation 2", texto: "Aposta da Sony nos anos 2000, disputando a geracao com o Nintendo Game Cube e o Sega Dreamcast." },
+                dir: { titulo: "Xbox Original", texto: "Lancado em 2001. Com o novo seculo, surgiu um novo player no mercado de games da Microsoft: o grande sucesso X-Box." }
+            },
+            {
+                sala: "7a Geracao", ano: "2004-2009", cor: "#00b3ff", tipo: "disco",
+                esq: { titulo: "Nintendo Wii", texto: "De 2006. Criou um conceito de interatividade em familia, com menor poder de processamento mas maior diversao." },
+                dir: { titulo: "Xbox 360", texto: "De 2006. Destacou-se pela alta definicao. Proporcionou ricas experiencias no desenvolvimento cognitivo por meio de interacoes." }
+            },
+            {
+                sala: "8a Geracao", ano: "2011-2019", cor: "#00e5c0", tipo: "disco",
+                esq: { titulo: "PlayStation 4", texto: "De 2013. A Sony e a Microsoft lancaram novas versoes em que o embate por grafico e processamento continuou." },
+                dir: { titulo: "Xbox One", texto: "De 2013. Junto com o PS4, representam o apice do poder grafico antes da era do Ray Tracing." }
+            },
+            {
+                sala: "9a Geracao", ano: "2019-XXXX", cor: "#39ff14", tipo: "disco",
+                esq: { titulo: "Xbox Series X/S", texto: "De 2020. Possui um chip grafico capaz de executar 12 teraflops (trilhoes de operacoes por segundo)." },
+                dir: { titulo: "PlayStation 5", texto: "De 2020. Disputa em efeitos graficos e tecnologia, entregando 10,88 teraflops de processamento." }
+            },
+            {
+                sala: "Em Construcao", ano: "Futuro", cor: "#00fff2", tipo: "vazio",
+                esq: { titulo: "", texto: "" },
+                dir: { titulo: "", texto: "" }
+            }
+        ];
+
+        // ==========================================================================
+        // TEXTURAS PROCEDURAIS (Estética Tron do Orientador)
+        function texturaGridNeon(corLinha) {
+            var c = document.createElement('canvas');
+            c.width = 256; 
+            c.height = 256;
+            var ctx = c.getContext('2d');
+            ctx.fillStyle = '#05010f';
+            ctx.fillRect(0, 0, 256, 256);
+            ctx.strokeStyle = corLinha;
+            ctx.lineWidth = 4;
+            ctx.shadowColor = corLinha;                
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(0, 0); ctx.lineTo(256, 0);
+            ctx.moveTo(0, 0); ctx.lineTo(0, 256);
+            ctx.stroke();
+            return c.toDataURL();
+        }
+
+        AFRAME.registerComponent('piso-neon', {
+            schema: { cor: { default: '#00fff2' }, repeat: { default: '8 8' } },
+            init: function () {
+                this.el.setAttribute('material', {
+                    shader: 'flat',                    
+                    src: texturaGridNeon(this.data.cor),
+                    repeat: this.data.repeat
+                });
+            }
+        });
+
+        AFRAME.registerComponent('painel-proximidade', {
+            init: function () {
+                this.ativo = false;
+                this.tela = this.el.querySelector('.tela-info');
+                this.worldPosJogador = new THREE.Vector3();
+                this.jogadorEl = document.querySelector('#camera-jogador');
+            },
+            tick: function () {
+                if (!this.jogadorEl || !this.tela) return;
+                this.jogadorEl.object3D.getWorldPosition(this.worldPosJogador);
+                var posLocal = this.worldPosJogador.clone();
+                this.el.object3D.worldToLocal(posLocal);
+
+                var eixoZTestado = posLocal.z - 2.0; 
+                var a = 3.0; 
+                var b = 5.0; 
+                var dentroElipse = ((posLocal.x * posLocal.x) / (a * a)) + ((eixoZTestado * eixoZTestado) / (b * b)) <= 1.0;
+
+                if (dentroElipse && !this.ativo) {
+                    this.ativo = true;
+                    this.tela.setAttribute('animation', 'property: scale; to: 1 1 1; dur: 400; easing: easeOutElastic');
+                } 
+                else if (!dentroElipse && this.ativo) {
+                    this.ativo = false;
+                    this.tela.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 200; easing: easeOutQuad');
+                }
+            }
+        });
+
+        AFRAME.registerComponent('gerador-de-salas', {
+            init: function () {
+                var centro = this.el;
+                
+                // VARIÁVEIS MESTRAS (Parametrizadas)
+                var raioRotunda = 20.0;     
+                var alturaImposta = 6.0; 
+                var corCoroa = '#ffee00';
+                
+                // Matemática do Decágono (10 lados)
+                var anguloRad = 18 * (Math.PI / 180);
+                var pX = raioRotunda * Math.sin(anguloRad); 
+                var pZ = -(raioRotunda * Math.cos(anguloRad)); 
+                
+                var alturaTopoArcos = alturaImposta + pX + 0.1; 
+                var raioTuboAro = 0.15;
+                var alturaAro = alturaTopoArcos + raioTuboAro; 
+                
+                // Oclusão Central
+                var raioOculus = raioRotunda * 0.25; 
+                var distYOculus = Math.sqrt(Math.pow(raioRotunda, 2) - Math.pow(raioOculus, 2));
+                var alturaOculus = alturaAro + distYOculus;
+
+                // 1. Chão Central Decagonal
+                var chaoCentral = document.createElement('a-circle');
+                chaoCentral.setAttribute('position', '0 0 0');
+                chaoCentral.setAttribute('rotation', '-90 18 0'); 
+                chaoCentral.setAttribute('radius', raioRotunda.toFixed(3));
+                chaoCentral.setAttribute('segments', '10');
+                chaoCentral.setAttribute('piso-neon', 'cor: #00fff2; repeat: ' + (raioRotunda * 0.9).toFixed(0) + ' ' + (raioRotunda * 0.9).toFixed(0));
+                centro.appendChild(chaoCentral);
+
+                // 2. Cúpula Principal Parametrizada
+                var cupulaPrincipal = document.createElement('a-sphere');
+                cupulaPrincipal.setAttribute('position', '0 ' + alturaAro.toFixed(3) + ' 0');
+                cupulaPrincipal.setAttribute('radius', raioRotunda.toFixed(3));
+                cupulaPrincipal.setAttribute('color', '#05010f');
+                cupulaPrincipal.setAttribute('material', 'side: back; roughness: 1');
+                cupulaPrincipal.setAttribute('theta-length', '90');
+                cupulaPrincipal.setAttribute('segments-width', '10');
+                cupulaPrincipal.setAttribute('rotation', '0 0 0');
+                centro.appendChild(cupulaPrincipal);
+
+                // 3. Anel Central (Oculus Neon) ajustado perfeitamente
+                var anelCentral = document.createElement('a-torus');
+                anelCentral.setAttribute('position', '0 ' + alturaOculus.toFixed(3) + ' 0');
+                anelCentral.setAttribute('radius', raioOculus.toFixed(3));
+                anelCentral.setAttribute('radius-tubular', '0.2');
+                anelCentral.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                anelCentral.setAttribute('rotation', '90 0 0');
+                anelCentral.setAttribute('segments-tubular', '10');
+                centro.appendChild(anelCentral);
+
+                // 4. Aro horizontal monumental da Base
+                var aroHorizontal = document.createElement('a-torus');
+                aroHorizontal.setAttribute('position', '0 ' + alturaAro.toFixed(3) + ' 0');
+                aroHorizontal.setAttribute('radius', raioRotunda.toFixed(3));
+                aroHorizontal.setAttribute('radius-tubular', raioTuboAro.toString());
+                aroHorizontal.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroHorizontal.setAttribute('rotation', '90 0 0'); 
+                aroHorizontal.setAttribute('segments-tubular', '10');
+                centro.appendChild(aroHorizontal);
+
+                var intervaloY = distYOculus / 3;
+
+                // Aro Intermediário 1 (Baixo)
+                var distY1 = intervaloY; 
+                var raioAroInt1 = Math.sqrt(Math.pow(raioRotunda, 2) - Math.pow(distY1, 2)); 
+                var alturaAroInt1 = alturaAro + distY1;
+
+                var aroInt1 = document.createElement('a-torus');
+                aroInt1.setAttribute('position', '0 ' + alturaAroInt1.toFixed(3) + ' 0');
+                aroInt1.setAttribute('radius', raioAroInt1.toFixed(3));
+                aroInt1.setAttribute('radius-tubular', '0.12');
+                aroInt1.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroInt1.setAttribute('rotation', '90 0 0');
+                aroInt1.setAttribute('segments-tubular', '10');
+                centro.appendChild(aroInt1);
+
+                // Aro Intermediário 2 (Alto)
+                var distY2 = intervaloY * 2; 
+                var raioAroInt2 = Math.sqrt(Math.pow(raioRotunda, 2) - Math.pow(distY2, 2));
+                var alturaAroInt2 = alturaAro + distY2;
+
+                var aroInt2 = document.createElement('a-torus');
+                aroInt2.setAttribute('position', '0 ' + alturaAroInt2.toFixed(3) + ' 0');
+                aroInt2.setAttribute('radius', raioAroInt2.toFixed(3));
+                aroInt2.setAttribute('radius-tubular', '0.12');
+                aroInt2.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroInt2.setAttribute('rotation', '90 0 0');
+                aroInt2.setAttribute('segments-tubular', '10');
+                centro.appendChild(aroInt2);
+
+                for (var i = 0; i < 10; i++) {
+                    var angulo = i * 36; 
+                    var conteudo = conteudosMuseu[i];
+                    var corNeon = conteudo.cor; 
+                    
+                    var ala = document.createElement('a-entity');
+                    ala.setAttribute('rotation', '0 ' + angulo + ' 0');
+                    
+                    // Êxedra Parede
+                    var exedraParede = document.createElement('a-cylinder');
+                    exedraParede.setAttribute('position', '0 ' + (alturaImposta/2) + ' ' + pZ);
+                    exedraParede.setAttribute('radius', pX.toFixed(3)); 
+                    exedraParede.setAttribute('height', alturaImposta);
+                    exedraParede.setAttribute('theta-start', '90');    
+                    exedraParede.setAttribute('theta-length', '180');  
+                    exedraParede.setAttribute('material', 'side: double; color: #030008; roughness: 0.9');
+                    exedraParede.setAttribute('open-ended', 'true');
+                    ala.appendChild(exedraParede);
+
+                    // Chão da Êxedra
+                    var exedraChao = document.createElement('a-circle');
+                    exedraChao.setAttribute('position', '0 0.105 ' + pZ);
+                    exedraChao.setAttribute('radius', pX.toFixed(3));
+                    exedraChao.setAttribute('rotation', '-90 0 0');
+                    exedraChao.setAttribute('theta-start', '0'); 
+                    exedraChao.setAttribute('theta-length', '180');
+                    exedraChao.setAttribute('piso-neon', 'cor: ' + corNeon + '; repeat: 4 2');
+                    ala.appendChild(exedraChao);
+
+                    // Semicúpula da Êxedra
+                    var exedraCupula = document.createElement('a-sphere');
+                    exedraCupula.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
+                    exedraCupula.setAttribute('radius', pX.toFixed(3));
+                    exedraCupula.setAttribute('theta-start', '0');   
+                    exedraCupula.setAttribute('theta-length', '90');
+                    exedraCupula.setAttribute('phi-start', '0');    
+                    exedraCupula.setAttribute('phi-length', '-180');  
+                    exedraCupula.setAttribute('material', 'color: #05010f; roughness: 0.9');
+                    ala.appendChild(exedraCupula);
+
+                    // Pilar de Emenda
+                    var pilarDir = document.createElement('a-cylinder');
+                    pilarDir.setAttribute('position', pX.toFixed(3) + ' ' + (alturaAro / 2).toFixed(3) + ' ' + pZ.toFixed(3));
+                    pilarDir.setAttribute('radius', '0.35');
+                    pilarDir.setAttribute('height', alturaAro.toFixed(3));
+                    pilarDir.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(pilarDir);
+
+                    var baseDir = document.createElement('a-cylinder');
+                    baseDir.setAttribute('position', pX.toFixed(3) + ' 0.5 ' + pZ.toFixed(3));
+                    baseDir.setAttribute('radius', '0.5'); baseDir.setAttribute('height', '1');
+                    baseDir.setAttribute('color', '#0c0c18');
+                    ala.appendChild(baseDir);
+
+                    // Arco de Entrada Neon
+                    var arcoEntrada = document.createElement('a-torus');
+                    arcoEntrada.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
+                    arcoEntrada.setAttribute('radius', pX.toFixed(3));
+                    arcoEntrada.setAttribute('radius-tubular', '0.1');
+                    arcoEntrada.setAttribute('arc', '180'); 
+                    arcoEntrada.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(arcoEntrada);
+
+                    // Cornija Neon
+                    var cornija = document.createElement('a-torus');
+                    cornija.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
+                    cornija.setAttribute('radius', (pX - 0.05).toFixed(3));
+                    cornija.setAttribute('radius-tubular', '0.05');
+                    cornija.setAttribute('arc', '180');
+                    cornija.setAttribute('rotation', '-90 0 0');
+                    cornija.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(cornija);
+
+                    // Faixa vertical neon do pilar
+                    var faixaDir = document.createElement('a-cylinder');
+                    faixaDir.setAttribute('position', pX.toFixed(3) + ' ' + (alturaAro / 2).toFixed(3) + ' ' + (pZ + 0.05).toFixed(3));
+                    faixaDir.setAttribute('radius', '0.1'); faixaDir.setAttribute('height', alturaAro.toFixed(3));
+                    faixaDir.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(faixaDir);
+
+                    // NERVURA NEON PARAMETRIZADA
+                    var anguloOculusRad = Math.asin(raioOculus / raioRotunda); 
+                    var arcoGrausNervura = 90 - (anguloOculusRad * 180 / Math.PI); 
+
+                    var arcoNervura = document.createElement('a-torus');
+                    arcoNervura.setAttribute('position', '0 ' + alturaAro.toFixed(3) + ' 0'); 
+                    arcoNervura.setAttribute('radius', raioRotunda.toFixed(3)); 
+                    arcoNervura.setAttribute('radius-tubular', '0.06'); 
+                    arcoNervura.setAttribute('arc', arcoGrausNervura.toFixed(2)); 
+                    arcoNervura.setAttribute('rotation', '0 72 0'); 
+                    arcoNervura.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    arcoNervura.setAttribute('segments-tubular', '42');
+                    ala.appendChild(arcoNervura);
+
+                    // PLATAFORMA ELEVADA
+                    var raioPlataforma = pX; 
+                    var alturaPlataforma = 0.1; 
+                    
+                    var plataformaChao = document.createElement('a-cylinder');
+                    plataformaChao.setAttribute('position', '0 ' + (alturaPlataforma / 2).toFixed(3) + ' ' + pZ);
+                    plataformaChao.setAttribute('radius', raioPlataforma.toFixed(3));
+                    plataformaChao.setAttribute('height', alturaPlataforma.toFixed(3));
+                    plataformaChao.setAttribute('material', 'color: #0c0c18; roughness: 0.8');
+                    ala.appendChild(plataformaChao);
+
+                    // Borda Neon da Plataforma
+                    var bordaPlataforma = document.createElement('a-torus');
+                    bordaPlataforma.setAttribute('position', '0 ' + alturaPlataforma.toFixed(3) + ' ' + pZ);
+                    bordaPlataforma.setAttribute('radius', raioPlataforma.toFixed(3));
+                    bordaPlataforma.setAttribute('radius-tubular', '0.03');
+                    bordaPlataforma.setAttribute('rotation', '90 0 0');
+                    bordaPlataforma.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(bordaPlataforma);
+
+                    // Linha Neon Conectando ao Centro
+                    var zBordaPlataforma = pZ + raioPlataforma; 
+                    var zBordaMonumento = -(raioRotunda * 0.16); 
+                    var comprimentoLinha = Math.abs(zBordaPlataforma - zBordaMonumento);
+                    var centroZLinha = (zBordaPlataforma + zBordaMonumento) / 2;
+
+                    var linhaCentro = document.createElement('a-plane');
+                    linhaCentro.setAttribute('position', '0 0.01 ' + centroZLinha.toFixed(3));
+                    linhaCentro.setAttribute('width', '0.3'); 
+                    linhaCentro.setAttribute('height', comprimentoLinha.toFixed(3));
+                    linhaCentro.setAttribute('rotation', '-90 0 0');
+                    linhaCentro.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    ala.appendChild(linhaCentro);
+
+                    // Listra Neon decorativa
+                    var listraNeon = document.createElement('a-cylinder');
+                    listraNeon.setAttribute('position', '0 1 ' + pZ);
+                    listraNeon.setAttribute('radius', (pX - 0.01).toFixed(3));
+                    listraNeon.setAttribute('height', '0.04');
+                    listraNeon.setAttribute('theta-start', '90'); listraNeon.setAttribute('theta-length', '180');
+                    listraNeon.setAttribute('material', 'shader: flat; color: ' + corNeon + '; side: double');
+                    listraNeon.setAttribute('open-ended', 'true');
+                    ala.appendChild(listraNeon);
+
+                    // ==========================================
+                    // CONDIÇÃO: Preencher apenas as 9 primeiras salas (Deixar a 10ª livre)
+                    // ==========================================
+                    if (i < 9) {
+                        // Pedestais
+                        var zPedestal = pZ - (raioRotunda * 0.15); 
+                        var expos = [
+                            { d: conteudo.esq, x: -2.8, z: zPedestal, rot: 20 },
+                            { d: conteudo.dir, x: 2.8, z: zPedestal, rot: -20 }
+                        ];
+
+                        expos.forEach(function (ex) {
+                            var ped = document.createElement('a-entity');
+                            ped.setAttribute('position', ex.x + ' 0.1 ' + ex.z);
+                            ped.setAttribute('rotation', '0 ' + ex.rot + ' 0');
+                            
+                            var base = document.createElement('a-box');
+                            base.setAttribute('position', '0 0.6 0');
+                            base.setAttribute('width', '1.0'); base.setAttribute('height', '1.2'); base.setAttribute('depth', '1.0');
+                            base.setAttribute('color', '#12121f');
+                            ped.appendChild(base);
+                            
+                            var topo = document.createElement('a-box');
+                            topo.setAttribute('position', '0 1.22 0');
+                            topo.setAttribute('width', '1.05'); topo.setAttribute('height', '0.06'); topo.setAttribute('depth', '1.05');
+                            topo.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                            ped.appendChild(topo);
+                            
+                            var raioEsq = document.createElement('a-circle');
+                            raioEsq.setAttribute('position', '0 0.02 2');
+                            raioEsq.setAttribute('radius', '2.5');
+                            raioEsq.setAttribute('scale', '1 1.5 1');
+                            raioEsq.setAttribute('rotation', '-90 0 0');
+                            raioEsq.setAttribute('material', 'shader: flat; color: #00fff2; opacity: 0.12; transparent: true');
+                            ped.appendChild(raioEsq);
+                            
+                            var tela = document.createElement('a-entity');
+                            tela.classList.add('tela-info');
+                            tela.setAttribute('position', '0 2.1 0');
+                            tela.setAttribute('scale', '0 0 0'); 
+                            
+                            var fundo = document.createElement('a-plane');
+                            fundo.setAttribute('width', '2.0'); fundo.setAttribute('height', '1.4');
+                            fundo.setAttribute('material', 'shader: flat; color: #06060f; opacity: 0.95; transparent: true');
+                            tela.appendChild(fundo);
+                            
+                            var moldura = document.createElement('a-plane');
+                            moldura.setAttribute('width', '2.1'); moldura.setAttribute('height', '1.5');
+                            moldura.setAttribute('position', '0 0 -0.01');
+                            moldura.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                            tela.appendChild(moldura);
+
+                            var titulo = document.createElement('a-text');
+                            titulo.setAttribute('value', ex.d.titulo);
+                            titulo.setAttribute('color', corNeon);
+                            titulo.setAttribute('align', 'center');
+                            titulo.setAttribute('width', '2.6');
+                            titulo.setAttribute('position', '0 0.42 0.02');
+                            tela.appendChild(titulo);
+
+                            var corpo = document.createElement('a-text');
+                            corpo.setAttribute('value', ex.d.texto);
+                            corpo.setAttribute('color', '#ffffff');
+                            corpo.setAttribute('align', 'center');
+                            corpo.setAttribute('width', '1.8');
+                            corpo.setAttribute('wrap-count', '30');
+                            corpo.setAttribute('position', '0 -0.05 0.02');
+                            tela.appendChild(corpo);
+
+                            ped.appendChild(tela);
+                            ped.setAttribute('painel-proximidade', ''); 
+                            ala.appendChild(ped);
+                        });
+
+                        // ==========================================
+                        // EXPOSITOR "ARCADE" GIGANTE (Mesa com Player)
+                        // ==========================================
+                        var totemArcade = document.createElement('a-entity');
+                        totemArcade.setAttribute('position', '0 0.1 ' + (pZ - (raioRotunda * 0.255)).toFixed(3)); 
+                        totemArcade.setAttribute('scale', '0.85 0.85 0.85');
+                        
+                        // Pernas (Aço Escuro)
+                        var pernaEsq = document.createElement('a-box');
+                        pernaEsq.setAttribute('position', '-1.45 2.4 0.4');
+                        pernaEsq.setAttribute('width', '0.1'); pernaEsq.setAttribute('height', '4.8'); pernaEsq.setAttribute('depth', '1.2');
+                        pernaEsq.setAttribute('color', '#080810'); 
+                        totemArcade.appendChild(pernaEsq);
+
+                        var pernaDir = document.createElement('a-box');
+                        pernaDir.setAttribute('position', '1.45 2.4 0.4');
+                        pernaDir.setAttribute('width', '0.1'); pernaDir.setAttribute('height', '4.8'); pernaDir.setAttribute('depth', '1.2');
+                        pernaDir.setAttribute('color', '#080810');
+                        totemArcade.appendChild(pernaDir);
+
+                        // Tela 4:3 Brilhante (Painel Central)
+                        var painelMeio = document.createElement('a-plane');
+                        painelMeio.setAttribute('position', '0 3.0 0.2');
+                        painelMeio.setAttribute('width', '2.8'); painelMeio.setAttribute('height', '2.1');
+                        painelMeio.setAttribute('material', 'shader: flat; color: #1a1a33');
+                        
+                        var areaVideo = document.createElement('a-plane');
+                        areaVideo.setAttribute('position', '0 0.35 0.01');
+                        areaVideo.setAttribute('width', '2.4'); areaVideo.setAttribute('height', '1.35');
+                        areaVideo.setAttribute('color', '#000000');
+                        painelMeio.appendChild(areaVideo);
+                        
+                        var textoVideo = document.createElement('a-text');
+                        textoVideo.setAttribute('value', '[ ESPACO PARA VIDEO ]');
+                        textoVideo.setAttribute('color', '#444444');
+                        textoVideo.setAttribute('align', 'center'); textoVideo.setAttribute('position', '0 0 0.02');
+                        areaVideo.appendChild(textoVideo);
+
+                        var textoMeio = document.createElement('a-text');
+                        textoMeio.setAttribute('value', 'Resumo historico e principais inovacoes da ' + conteudo.sala + '...\n(Texto dinamico do carrossel)');
+                        textoMeio.setAttribute('color', '#00fff2');
+                        textoMeio.setAttribute('align', 'center'); 
+                        textoMeio.setAttribute('width', '2.5');
+                        textoMeio.setAttribute('position', '0 -0.6 0.01');
+                        painelMeio.appendChild(textoMeio);
+                        totemArcade.appendChild(painelMeio);
+
+                        // Marquee Luminoso (Título da Sala e Ano)
+                        var painelCima = document.createElement('a-plane');
+                        painelCima.setAttribute('position', '0 4.396 0.4');
+                        painelCima.setAttribute('rotation', '30 0 0');
+                        painelCima.setAttribute('width', '2.8'); painelCima.setAttribute('height', '0.8');
+                        painelCima.setAttribute('material', 'shader: flat; color: ' + corNeon); 
+                        var textoCima = document.createElement('a-text');
+                        textoCima.setAttribute('value', conteudo.sala.toUpperCase() + '\n( ' + conteudo.ano + ' )');
+                        textoCima.setAttribute('color', '#05010f');
+                        textoCima.setAttribute('align', 'center');
+                        textoCima.setAttribute('width', '4.5'); 
+                        textoCima.setAttribute('position', '0 0 0.01');
+                        painelCima.appendChild(textoCima);
+                        totemArcade.appendChild(painelCima);
+
+                        // ==========================================
+                        // Nova Mesa de Controle (Botões Geométricos do Player)
+                        // ==========================================
+                        var painelBaixo = document.createElement('a-plane');
+                        painelBaixo.setAttribute('position', '0 1.596 0.554');
+                        painelBaixo.setAttribute('rotation', '-45 0 0');
+                        painelBaixo.setAttribute('width', '2.8'); painelBaixo.setAttribute('height', '1.0');
+                        painelBaixo.setAttribute('color', '#080810'); 
+                        
+                        var detalheMesa = document.createElement('a-plane');
+                        detalheMesa.setAttribute('position', '0 0 0.01');
+                        detalheMesa.setAttribute('width', '2.7'); detalheMesa.setAttribute('height', '0.9');
+                        detalheMesa.setAttribute('material', 'shader: flat; color: ' + corNeon); 
+                        painelBaixo.appendChild(detalheMesa);
+                        
+                        var fundoMesa = document.createElement('a-plane');
+                        fundoMesa.setAttribute('position', '0 0 0.02');
+                        fundoMesa.setAttribute('width', '2.6'); fundoMesa.setAttribute('height', '0.8');
+                        fundoMesa.setAttribute('color', '#05010f'); 
+                        painelBaixo.appendChild(fundoMesa);
+
+                        // Botão Anterior (⏮)
+                        var btnPrev = document.createElement('a-circle');
+                        btnPrev.setAttribute('position', '-0.6 0 0.03'); btnPrev.setAttribute('radius', '0.15'); btnPrev.setAttribute('color', '#0a0a15');
+                        var ringPrev = document.createElement('a-ring');
+                        ringPrev.setAttribute('radius-inner', '0.13'); ringPrev.setAttribute('radius-outer', '0.15'); ringPrev.setAttribute('position', '0 0 0.01');
+                        ringPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnPrev.appendChild(ringPrev);
+                        var iconPrev = document.createElement('a-triangle');
+                        iconPrev.setAttribute('vertex-a', '0 0.07 0'); iconPrev.setAttribute('vertex-b', '-0.07 -0.07 0'); iconPrev.setAttribute('vertex-c', '0.07 -0.07 0');
+                        iconPrev.setAttribute('rotation', '0 0 90'); iconPrev.setAttribute('position', '-0.02 0 0.02'); iconPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnPrev.appendChild(iconPrev);
+                        var barPrev = document.createElement('a-plane');
+                        barPrev.setAttribute('width', '0.04'); barPrev.setAttribute('height', '0.14'); barPrev.setAttribute('position', '-0.08 0 0.02'); barPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnPrev.appendChild(barPrev);
+                        painelBaixo.appendChild(btnPrev);
+
+                        // Botão Play/Pause (⏯)
+                        var btnPlay = document.createElement('a-circle');
+                        btnPlay.setAttribute('position', '0 0 0.03'); btnPlay.setAttribute('radius', '0.15'); btnPlay.setAttribute('color', '#0a0a15');
+                        var ringPlay = document.createElement('a-ring');
+                        ringPlay.setAttribute('radius-inner', '0.13'); ringPlay.setAttribute('radius-outer', '0.15'); ringPlay.setAttribute('position', '0 0 0.01');
+                        ringPlay.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnPlay.appendChild(ringPlay);
+                        var iconPlay = document.createElement('a-triangle');
+                        iconPlay.setAttribute('vertex-a', '0 0.07 0'); iconPlay.setAttribute('vertex-b', '-0.07 -0.07 0'); iconPlay.setAttribute('vertex-c', '0.07 -0.07 0');
+                        iconPlay.setAttribute('rotation', '0 0 -90'); iconPlay.setAttribute('position', '0.02 0 0.02'); iconPlay.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnPlay.appendChild(iconPlay);
+                        painelBaixo.appendChild(btnPlay);
+
+                        // Botão Próximo (⏭)
+                        var btnNext = document.createElement('a-circle');
+                        btnNext.setAttribute('position', '0.6 0 0.03'); btnNext.setAttribute('radius', '0.15'); btnNext.setAttribute('color', '#0a0a15');
+                        var ringNext = document.createElement('a-ring');
+                        ringNext.setAttribute('radius-inner', '0.13'); ringNext.setAttribute('radius-outer', '0.15'); ringNext.setAttribute('position', '0 0 0.01');
+                        ringNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnNext.appendChild(ringNext);
+                        var iconNext = document.createElement('a-triangle');
+                        iconNext.setAttribute('vertex-a', '0 0.07 0'); iconNext.setAttribute('vertex-b', '-0.07 -0.07 0'); iconNext.setAttribute('vertex-c', '0.07 -0.07 0');
+                        iconNext.setAttribute('rotation', '0 0 -90'); iconNext.setAttribute('position', '0.02 0 0.02'); iconNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnNext.appendChild(iconNext);
+                        var barNext = document.createElement('a-plane');
+                        barNext.setAttribute('width', '0.04'); barNext.setAttribute('height', '0.14'); barNext.setAttribute('position', '0.08 0 0.02'); barNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                        btnNext.appendChild(barNext);
+                        painelBaixo.appendChild(btnNext);
+                        
+                        totemArcade.appendChild(painelBaixo);
+                        ala.appendChild(totemArcade);
+                    }
+
+                    centro.appendChild(ala);
+                }
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene renderer="antialias: true; colorManagement: true" background="color: #05010f" webxr="referenceSpaceType: local">
+
+        <!-- GERENCIADOR DE ASSETS (Logo do Museu) -->
+        <a-assets>
+            <img id="logo-mgc" src="https://www.museugameciencia.com.br/assets/LogoMuseu-C0J6co-V.png" crossorigin="anonymous">
+        </a-assets>
+
+        <!-- ======= FUNDO DO MUNDO (Vácuo Negro) ======= -->
+        <a-sky color="#000000"></a-sky>
+
+        <!-- ======= GERADOR DAS SALAS + MONUMENTO CENTRAL ======= -->
+        <a-entity gerador-de-salas></a-entity>
+
+        <!-- MONUMENTO CENTRAL SIMPLIFICADO -->
+        <a-entity position="0 0 0">
+            <a-cylinder position="0 0.25 0" radius="3.2" height="0.5" color="#0c0c18"></a-cylinder>
+            <a-torus position="0 0.5 0" rotation="90 0 0" radius="3.2" radius-tubular="0.05" material="shader: flat; color: #00fff2"></a-torus>
+            <a-cylinder position="0 1.8 0" radius="0.35" height="2.6" color="#12121f"></a-cylinder>
+            <a-entity position="0 3.6 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 14000; easing: linear">
+                <a-box width="0.9" height="0.9" depth="0.9" material="shader: flat; color: #ff00a0"></a-box>
+                <a-torus radius="1.1" radius-tubular="0.04" rotation="70 0 0" material="shader: flat; color: #00fff2"></a-torus>
+            </a-entity>
+        </a-entity>
+
+        <!-- ======= TELÃO JUMBOTRON 4:3 (Estilo NBA - Telas Inclinadas) ======= -->
+        <!-- Pendurado a 16 metros de altura -->
+        <a-entity position="0 16 0">
+            <!-- Estrutura/Miolo do Telão -->
+            <a-box width="5.8" height="4.5" depth="5.8" color="#080810"></a-box>
+            
+            <!-- Cabos de sustentação que sobem até o teto -->
+            <a-cylinder position="-2.8 12 -2.8" radius="0.05" height="24" color="#111"></a-cylinder>
+            <a-cylinder position="2.8 12 -2.8" radius="0.05" height="24" color="#111"></a-cylinder>
+            <a-cylinder position="-2.8 12 2.8" radius="0.05" height="24" color="#111"></a-cylinder>
+            <a-cylinder position="2.8 12 2.8" radius="0.05" height="24" color="#111"></a-cylinder>
+
+            <!-- TELA FRENTE (+Z) -> Rotação X = 10 para inclinar para baixo -->
+            <a-entity position="0 0 3.5" rotation="10 0 0">
+                <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
+                    <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
+                    
+                    <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
+                    
+                    <a-text value="CONHECIMENTO, APRENDIZADO E DIVERSAO" align="center" width="4.8" position="0 -1.4 0.02" color="#05010f"></a-text>
+                    
+                    <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                    <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                </a-plane>
+            </a-entity>
+
+            <!-- TELA COSTAS (-Z) -->
+            <a-entity position="0 0 -3.5" rotation="10 180 0">
+                <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
+                    <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
+                    
+                    <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
+                    
+                    <a-text value="CONHECIMENTO, APRENDIZADO E DIVERSAO" align="center" width="4.8" position="0 -1.4 0.02" color="#05010f"></a-text>
+
+                    <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                    <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                </a-plane>
+            </a-entity>
+
+            <!-- TELA DIREITA (+X) -->
+            <a-entity position="3.5 0 0" rotation="10 90 0">
+                <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
+                    <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
+                    
+                    <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
+                    
+                    <a-text value="DIVULGANDO A CIENCIA POR MEIO DOS JOGOS" align="center" width="4.2" position="0 -1.4 0.02" color="#05010f"></a-text>
+
+                    <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                    <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                </a-plane>
+            </a-entity>
+
+            <!-- TELA ESQUERDA (-X) -->
+            <a-entity position="-3.5 0 0" rotation="10 -90 0">
+                <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
+                    <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
+                    
+                    <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
+                    
+                    <a-text value="DIVULGANDO A CIENCIA POR MEIO DOS JOGOS" align="center" width="4.2" position="0 -1.4 0.02" color="#05010f"></a-text>
+
+                    <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                    <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
+                </a-plane>
+            </a-entity>
+        </a-entity>
+
+        <a-light type="ambient" color="#3a3550" intensity="0.7"></a-light>
+        <a-light type="point" intensity="0.9" position="0 8 0" color="#ffffff" distance="60"></a-light>
+
+        <!-- JOGADOR -->
+        <a-entity id="rig" position="0 1.6 8" movement-controls="speed: 0.25">
+            <a-camera id="camera-jogador" look-controls>
+                <a-cursor color="#00fff2" fuse="false"></a-cursor>
+            </a-camera>
+            <a-entity laser-controls="hand: left" raycaster="far: 10" line="color: #00fff2; opacity: 0.6"></a-entity>
+            <a-entity laser-controls="hand: right" raycaster="far: 10" line="color: #ff00a0; opacity: 0.6"></a-entity>
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>
