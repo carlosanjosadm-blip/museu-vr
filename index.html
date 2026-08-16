@@ -70,7 +70,7 @@
         ];
 
         // ==========================================================================
-        // TEXTURAS PROCEDURAIS
+        // TEXTURAS PROCEDURAIS E COMPONENTES
         // ==========================================================================
         function texturaGridNeon(corLinha) {
             var c = document.createElement('canvas');
@@ -90,9 +90,19 @@
             return c.toDataURL();
         }
 
+        // COMPONENTE PISO NEON (Atualizado com método UPDATE para reagir ao Lights Out)
         AFRAME.registerComponent('piso-neon', {
             schema: { cor: { default: '#00fff2' }, repeat: { default: '8 8' } },
             init: function () {
+                this.aplicarTextura();
+            },
+            update: function (oldData) {
+                // Redesenha a textura se a cor for alterada durante o jogo
+                if (oldData.cor !== this.data.cor || oldData.repeat !== this.data.repeat) {
+                    this.aplicarTextura();
+                }
+            },
+            aplicarTextura: function() {
                 this.el.setAttribute('material', {
                     shader: 'flat',                    
                     src: texturaGridNeon(this.data.cor),
@@ -101,6 +111,7 @@
             }
         });
 
+        // COMPONENTE DE PROXIMIDADE (Painel do Pedestal)
         AFRAME.registerComponent('painel-proximidade', {
             init: function () {
                 this.ativo = false;
@@ -130,14 +141,30 @@
             }
         });
 
+        // ==========================================
+        // MOTOR DO ESCAPE ROOM (Gerador e Lógica)
+        // ==========================================
         AFRAME.registerComponent('gerador-de-salas', {
             init: function () {
+                var self = this;
                 var centro = this.el;
                 
+                // Variáveis de Estado do Escape Room
+                this.corApagada = '#222233'; 
+                this.corCoroa = '#ffee00';
+                this.lightsOutState = new Array(10).fill(false);
+                this.terminalStep = 0; 
+                this.senhas = ["1", "2", "3", "4"]; // 4 Senhas para 4 anéis
+                this.inputAtual = "";
+                
+                // Armazenamento de Entidades
+                this.aneisCupula = [];
+                this.arquiteturas = [];
+                this.totensCores = []; 
+
                 // VARIÁVEIS MESTRAS
                 var raioRotunda = 20.0;     
                 var alturaImposta = 6.0; 
-                var corCoroa = '#ffee00';
                 
                 var anguloRad = 18 * (Math.PI / 180);
                 var pX = raioRotunda * Math.sin(anguloRad); 
@@ -171,29 +198,21 @@
                 cupulaPrincipal.setAttribute('rotation', '0 0 0');
                 centro.appendChild(cupulaPrincipal);
 
-                // 3. Anel Central
-                var anelCentral = document.createElement('a-torus');
-                anelCentral.setAttribute('position', '0 ' + alturaOculus.toFixed(3) + ' 0');
-                anelCentral.setAttribute('radius', raioOculus.toFixed(3));
-                anelCentral.setAttribute('radius-tubular', '0.2');
-                anelCentral.setAttribute('material', 'shader: flat; color: ' + corCoroa);
-                anelCentral.setAttribute('rotation', '90 0 0');
-                anelCentral.setAttribute('segments-tubular', '10');
-                centro.appendChild(anelCentral);
-
-                // 4. Aro horizontal base
+                // 3. ANÉIS DA CÚPULA (Apagados no início)
+                
+                // Aro horizontal base (Senha 1)
                 var aroHorizontal = document.createElement('a-torus');
                 aroHorizontal.setAttribute('position', '0 ' + alturaAro.toFixed(3) + ' 0');
                 aroHorizontal.setAttribute('radius', raioRotunda.toFixed(3));
                 aroHorizontal.setAttribute('radius-tubular', raioTuboAro.toString());
-                aroHorizontal.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroHorizontal.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                 aroHorizontal.setAttribute('rotation', '90 0 0'); 
                 aroHorizontal.setAttribute('segments-tubular', '10');
                 centro.appendChild(aroHorizontal);
 
                 var intervaloY = distYOculus / 3;
 
-                // Aro Intermediário 1
+                // Aro Intermediário 1 (Senha 2)
                 var distY1 = intervaloY; 
                 var raioAroInt1 = Math.sqrt(Math.pow(raioRotunda, 2) - Math.pow(distY1, 2)); 
                 var alturaAroInt1 = alturaAro + distY1;
@@ -201,12 +220,12 @@
                 aroInt1.setAttribute('position', '0 ' + alturaAroInt1.toFixed(3) + ' 0');
                 aroInt1.setAttribute('radius', raioAroInt1.toFixed(3));
                 aroInt1.setAttribute('radius-tubular', '0.12');
-                aroInt1.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroInt1.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                 aroInt1.setAttribute('rotation', '90 0 0');
                 aroInt1.setAttribute('segments-tubular', '10');
                 centro.appendChild(aroInt1);
 
-                // Aro Intermediário 2
+                // Aro Intermediário 2 (Senha 3)
                 var distY2 = intervaloY * 2; 
                 var raioAroInt2 = Math.sqrt(Math.pow(raioRotunda, 2) - Math.pow(distY2, 2));
                 var alturaAroInt2 = alturaAro + distY2;
@@ -214,12 +233,29 @@
                 aroInt2.setAttribute('position', '0 ' + alturaAroInt2.toFixed(3) + ' 0');
                 aroInt2.setAttribute('radius', raioAroInt2.toFixed(3));
                 aroInt2.setAttribute('radius-tubular', '0.12');
-                aroInt2.setAttribute('material', 'shader: flat; color: ' + corCoroa);
+                aroInt2.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                 aroInt2.setAttribute('rotation', '90 0 0');
                 aroInt2.setAttribute('segments-tubular', '10');
                 centro.appendChild(aroInt2);
 
-                for (var i = 0; i < 10; i++) {
+                // Anel Central Oculus (Senha 4)
+                var anelCentral = document.createElement('a-torus');
+                anelCentral.setAttribute('position', '0 ' + alturaOculus.toFixed(3) + ' 0');
+                anelCentral.setAttribute('radius', raioOculus.toFixed(3));
+                anelCentral.setAttribute('radius-tubular', '0.2');
+                anelCentral.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
+                anelCentral.setAttribute('rotation', '90 0 0');
+                anelCentral.setAttribute('segments-tubular', '10');
+                centro.appendChild(anelCentral);
+
+                // Array de aneis para progressão (Do mais baixo ao mais alto)
+                this.aneisCupula.push(aroHorizontal); // Step 0
+                this.aneisCupula.push(aroInt1);       // Step 1
+                this.aneisCupula.push(aroInt2);       // Step 2
+                this.aneisCupula.push(anelCentral);   // Step 3
+
+                // GERAÇÃO DAS 10 SALAS
+                for (let i = 0; i < 10; i++) {
                     var angulo = i * 36; 
                     var conteudo = conteudosMuseu[i];
                     var corNeon = conteudo.cor; 
@@ -227,6 +263,13 @@
                     var ala = document.createElement('a-entity');
                     ala.setAttribute('rotation', '0 ' + angulo + ' 0');
                     
+                    // ==========================================
+                    // GRUPO DE ARQUITETURA (Teto, Paredes, Pilares)
+                    // Fica invisível no início (scale 0 0 0)
+                    // ==========================================
+                    var grupoArq = document.createElement('a-entity');
+                    grupoArq.setAttribute('scale', '0 0 0'); 
+
                     var exedraParede = document.createElement('a-cylinder');
                     exedraParede.setAttribute('position', '0 ' + (alturaImposta/2) + ' ' + pZ);
                     exedraParede.setAttribute('radius', pX.toFixed(3)); 
@@ -235,14 +278,7 @@
                     exedraParede.setAttribute('theta-length', '180');  
                     exedraParede.setAttribute('material', 'side: double; color: #030008; roughness: 0.9');
                     exedraParede.setAttribute('open-ended', 'true');
-                    ala.appendChild(exedraParede);
-
-                    var exedraChao = document.createElement('a-circle');
-                    exedraChao.setAttribute('position', '0 0.105 ' + pZ);
-                    exedraChao.setAttribute('radius', pX.toFixed(3));
-                    exedraChao.setAttribute('rotation', '-90 0 0');
-                    exedraChao.setAttribute('piso-neon', 'cor: ' + corNeon + '; repeat: 4 4');
-                    ala.appendChild(exedraChao);
+                    grupoArq.appendChild(exedraParede);
 
                     var exedraCupula = document.createElement('a-sphere');
                     exedraCupula.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
@@ -252,20 +288,20 @@
                     exedraCupula.setAttribute('phi-start', '0');    
                     exedraCupula.setAttribute('phi-length', '-180');  
                     exedraCupula.setAttribute('material', 'color: #05010f; roughness: 0.9');
-                    ala.appendChild(exedraCupula);
+                    grupoArq.appendChild(exedraCupula);
 
                     var pilarDir = document.createElement('a-cylinder');
                     pilarDir.setAttribute('position', pX.toFixed(3) + ' ' + (alturaAro / 2).toFixed(3) + ' ' + pZ.toFixed(3));
                     pilarDir.setAttribute('radius', '0.35');
                     pilarDir.setAttribute('height', alturaAro.toFixed(3));
                     pilarDir.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                    ala.appendChild(pilarDir);
+                    grupoArq.appendChild(pilarDir);
 
                     var baseDir = document.createElement('a-cylinder');
                     baseDir.setAttribute('position', pX.toFixed(3) + ' 0.5 ' + pZ.toFixed(3));
                     baseDir.setAttribute('radius', '0.5'); baseDir.setAttribute('height', '1');
                     baseDir.setAttribute('color', '#0c0c18');
-                    ala.appendChild(baseDir);
+                    grupoArq.appendChild(baseDir);
 
                     var arcoEntrada = document.createElement('a-torus');
                     arcoEntrada.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
@@ -273,7 +309,7 @@
                     arcoEntrada.setAttribute('radius-tubular', '0.1');
                     arcoEntrada.setAttribute('arc', '180'); 
                     arcoEntrada.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                    ala.appendChild(arcoEntrada);
+                    grupoArq.appendChild(arcoEntrada);
 
                     var cornija = document.createElement('a-torus');
                     cornija.setAttribute('position', '0 ' + alturaImposta + ' ' + pZ);
@@ -282,13 +318,13 @@
                     cornija.setAttribute('arc', '180');
                     cornija.setAttribute('rotation', '-90 0 0');
                     cornija.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                    ala.appendChild(cornija);
+                    grupoArq.appendChild(cornija);
 
                     var faixaDir = document.createElement('a-cylinder');
                     faixaDir.setAttribute('position', pX.toFixed(3) + ' ' + (alturaAro / 2).toFixed(3) + ' ' + (pZ + 0.05).toFixed(3));
                     faixaDir.setAttribute('radius', '0.1'); faixaDir.setAttribute('height', alturaAro.toFixed(3));
                     faixaDir.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                    ala.appendChild(faixaDir);
+                    grupoArq.appendChild(faixaDir);
 
                     var anguloOculusRad = Math.asin(raioOculus / raioRotunda); 
                     var arcoGrausNervura = 90 - (anguloOculusRad * 180 / Math.PI); 
@@ -301,7 +337,20 @@
                     arcoNervura.setAttribute('rotation', '0 72 0'); 
                     arcoNervura.setAttribute('material', 'shader: flat; color: ' + corNeon);
                     arcoNervura.setAttribute('segments-tubular', '42');
-                    ala.appendChild(arcoNervura);
+                    grupoArq.appendChild(arcoNervura);
+
+                    ala.appendChild(grupoArq);
+                    this.arquiteturas.push(grupoArq);
+
+                    // ==========================================
+                    // LINHAS NEON E PLATAFORMAS (Luz Controlada)
+                    // ==========================================
+                    var exedraChao = document.createElement('a-circle');
+                    exedraChao.setAttribute('position', '0 0.105 ' + pZ);
+                    exedraChao.setAttribute('radius', pX.toFixed(3));
+                    exedraChao.setAttribute('rotation', '-90 0 0');
+                    exedraChao.setAttribute('piso-neon', 'cor: ' + this.corApagada + '; repeat: 4 4');
+                    ala.appendChild(exedraChao);
 
                     var raioPlataforma = pX; 
                     var alturaPlataforma = 0.1; 
@@ -318,7 +367,7 @@
                     bordaPlataforma.setAttribute('radius', raioPlataforma.toFixed(3));
                     bordaPlataforma.setAttribute('radius-tubular', '0.03');
                     bordaPlataforma.setAttribute('rotation', '90 0 0');
-                    bordaPlataforma.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    bordaPlataforma.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                     ala.appendChild(bordaPlataforma);
 
                     var zBordaPlataforma = pZ + raioPlataforma; 
@@ -328,10 +377,10 @@
 
                     var linhaCentro = document.createElement('a-plane');
                     linhaCentro.setAttribute('position', '0 0.01 ' + centroZLinha.toFixed(3));
-                    linhaCentro.setAttribute('width', '0.3'); 
+                    linhaCentro.setAttribute('width', '0.25'); 
                     linhaCentro.setAttribute('height', comprimentoLinha.toFixed(3));
                     linhaCentro.setAttribute('rotation', '-90 0 0');
-                    linhaCentro.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    linhaCentro.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                     ala.appendChild(linhaCentro);
 
                     var listraNeon = document.createElement('a-cylinder');
@@ -339,87 +388,68 @@
                     listraNeon.setAttribute('radius', (pX - 0.01).toFixed(3));
                     listraNeon.setAttribute('height', '0.04');
                     listraNeon.setAttribute('theta-start', '90'); listraNeon.setAttribute('theta-length', '180');
-                    listraNeon.setAttribute('material', 'shader: flat; color: ' + corNeon + '; side: double');
+                    listraNeon.setAttribute('material', 'shader: flat; color: ' + this.corApagada + '; side: double');
                     listraNeon.setAttribute('open-ended', 'true');
                     ala.appendChild(listraNeon);
 
                     // ==========================================
-                    // NOVO TOTEM (Botão Interativo estilo Portal 2)
+                    // TOTEM (Botão Interativo estilo Portal 2)
                     // ==========================================
-                    var zBordaMonumento = -(raioRotunda * 0.16); // Recalcula a borda do monumento central
-                    var zTotem = zBordaMonumento - 0.3; // Posicionado graciosamente sobre a ponta da linha neon
-                    
+                    var zTotem = zBordaMonumento - 0.3; 
                     var totemBotao = document.createElement('a-entity');
                     totemBotao.setAttribute('position', '0 0 ' + zTotem.toFixed(3));
-                    
-                    // Rotaciona a entidade do totem inteira para a fenda neon e botão apontarem para o centro (monumento)
                     totemBotao.setAttribute('rotation', '0 180 0'); 
                     
-                    // Base do totem
                     var baseTotem = document.createElement('a-cylinder');
-                    baseTotem.setAttribute('radius', '0.3');
-                    baseTotem.setAttribute('height', '0.08');
-                    baseTotem.setAttribute('position', '0 0.04 0');
-                    baseTotem.setAttribute('color', '#080810');
+                    baseTotem.setAttribute('radius', '0.3'); baseTotem.setAttribute('height', '0.08'); baseTotem.setAttribute('position', '0 0.04 0'); baseTotem.setAttribute('color', '#080810');
                     totemBotao.appendChild(baseTotem);
                     
-                    // Anel Neon na base
                     var anelBaseTotem = document.createElement('a-torus');
-                    anelBaseTotem.setAttribute('radius', '0.3');
-                    anelBaseTotem.setAttribute('radius-tubular', '0.01');
-                    anelBaseTotem.setAttribute('position', '0 0.08 0'); // Repousa sobre a base
-                    anelBaseTotem.setAttribute('rotation', '90 0 0');
-                    anelBaseTotem.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    anelBaseTotem.setAttribute('radius', '0.3'); anelBaseTotem.setAttribute('radius-tubular', '0.01'); anelBaseTotem.setAttribute('position', '0 0.08 0'); anelBaseTotem.setAttribute('rotation', '90 0 0');
+                    anelBaseTotem.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                     totemBotao.appendChild(anelBaseTotem);
                     
-                    // Corpo principal do totem
                     var corpoTotem = document.createElement('a-cylinder');
-                    corpoTotem.setAttribute('radius', '0.22');
-                    corpoTotem.setAttribute('height', '1.1');
-                    corpoTotem.setAttribute('position', '0 0.63 0');
-                    corpoTotem.setAttribute('color', '#12121f');
+                    corpoTotem.setAttribute('radius', '0.22'); corpoTotem.setAttribute('height', '1.1'); corpoTotem.setAttribute('position', '0 0.63 0'); corpoTotem.setAttribute('color', '#12121f');
                     totemBotao.appendChild(corpoTotem);
 
-                    // Faixa vertical neon (Fenda frontal estilo sci-fi)
                     var faixaTotem = document.createElement('a-plane');
-                    faixaTotem.setAttribute('width', '0.05');
-                    faixaTotem.setAttribute('height', '0.9');
-                    // Como giramos 180 graus, a frente agora é o eixo Z positivo local (+0.221)
-                    faixaTotem.setAttribute('position', '0 0.63 0.221'); 
-                    faixaTotem.setAttribute('material', 'shader: flat; color: ' + corNeon);
+                    faixaTotem.setAttribute('width', '0.05'); faixaTotem.setAttribute('height', '0.9'); faixaTotem.setAttribute('position', '0 0.63 0.221'); 
+                    faixaTotem.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
                     totemBotao.appendChild(faixaTotem);
 
-                    // Cabeça inclinada do totem
                     var cabecaTotem = document.createElement('a-entity');
                     cabecaTotem.setAttribute('position', '0 1.18 0');
-                    // Gira em X negativo para inclinar "para a frente" (acompanhando a fenda do totem)
                     cabecaTotem.setAttribute('rotation', '-20 180 0'); 
                     
                     var cilindroCabeca = document.createElement('a-cylinder');
-                    cilindroCabeca.setAttribute('radius', '0.22');
-                    cilindroCabeca.setAttribute('height', '0.15');
-                    cilindroCabeca.setAttribute('color', '#0c0c18');
+                    cilindroCabeca.setAttribute('radius', '0.22'); cilindroCabeca.setAttribute('height', '0.15'); cilindroCabeca.setAttribute('color', '#0c0c18');
                     cabecaTotem.appendChild(cilindroCabeca);
 
-                    // Aro estético metálico ao redor do botão
                     var aroBotao = document.createElement('a-torus');
-                    aroBotao.setAttribute('radius', '0.22');
-                    aroBotao.setAttribute('radius-tubular', '0.015');
-                    aroBotao.setAttribute('position', '0 0.075 0');
-                    aroBotao.setAttribute('rotation', '90 0 0');
+                    aroBotao.setAttribute('radius', '0.22'); aroBotao.setAttribute('radius-tubular', '0.015'); aroBotao.setAttribute('position', '0 0.075 0'); aroBotao.setAttribute('rotation', '90 0 0');
                     aroBotao.setAttribute('material', 'shader: flat; color: #333');
                     cabecaTotem.appendChild(aroBotao);
 
-                    // O Botão Físico Brilhante
+                    // BOTÃO FÍSICO COM RAYCASTER
                     var botaoFisico = document.createElement('a-cylinder');
-                    botaoFisico.setAttribute('radius', '0.16');
-                    botaoFisico.setAttribute('height', '0.06');
-                    botaoFisico.setAttribute('position', '0 0.08 0');
-                    botaoFisico.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                    cabecaTotem.appendChild(botaoFisico);
+                    botaoFisico.classList.add('interactable'); 
+                    botaoFisico.setAttribute('radius', '0.16'); botaoFisico.setAttribute('height', '0.06'); botaoFisico.setAttribute('position', '0 0.08 0');
+                    botaoFisico.setAttribute('material', 'shader: flat; color: ' + this.corApagada);
+                    
+                    botaoFisico.addEventListener('click', (function(idx) {
+                        return function() { self.processarLightsOut(idx); };
+                    })(i));
 
+                    cabecaTotem.appendChild(botaoFisico);
                     totemBotao.appendChild(cabecaTotem);
                     ala.appendChild(totemBotao);
+
+                    // ==========================================
+                    // GRUPO DE CONTEÚDO (Invisível no Início)
+                    // ==========================================
+                    var grupoCont = document.createElement('a-entity');
+                    grupoCont.setAttribute('scale', '0 0 0');
 
                     if (i < 9) {
                         var zPedestal = pZ - (raioRotunda * 0.15); 
@@ -469,13 +499,11 @@
                             moldura.setAttribute('material', 'shader: flat; color: ' + corNeon);
                             tela.appendChild(moldura);
 
-                            // TITULO TROIKA 
                             var titulo = document.createElement('a-entity');
                             titulo.setAttribute('troika-text', 'value: ' + ex.d.titulo + '; color: ' + corNeon + '; align: center; fontSize: 0.16; maxWidth: 1.9');
                             titulo.setAttribute('position', '0 0.42 0.02');
                             tela.appendChild(titulo);
 
-                            // CORPO TROIKA
                             var corpo = document.createElement('a-entity');
                             corpo.setAttribute('troika-text', 'value: ' + ex.d.texto + '; color: #ffffff; align: center; fontSize: 0.085; maxWidth: 1.8; lineHeight: 1.2');
                             corpo.setAttribute('position', '0 -0.05 0.02');
@@ -483,127 +511,235 @@
 
                             ped.appendChild(tela);
                             ped.setAttribute('painel-proximidade', ''); 
-                            ala.appendChild(ped);
+                            grupoCont.appendChild(ped);
                         });
 
                         var totemArcade = document.createElement('a-entity');
                         totemArcade.setAttribute('position', '0 0.1 ' + (pZ - (raioRotunda * 0.255)).toFixed(3)); 
                         totemArcade.setAttribute('scale', '0.85 0.85 0.85');
                         
-                        var pernaEsq = document.createElement('a-box');
-                        pernaEsq.setAttribute('position', '-1.45 2.4 0.4');
-                        pernaEsq.setAttribute('width', '0.1'); pernaEsq.setAttribute('height', '4.8'); pernaEsq.setAttribute('depth', '1.2');
-                        pernaEsq.setAttribute('color', '#080810'); 
-                        totemArcade.appendChild(pernaEsq);
+                        var pernaEsq = document.createElement('a-box'); pernaEsq.setAttribute('position', '-1.45 2.4 0.4'); pernaEsq.setAttribute('width', '0.1'); pernaEsq.setAttribute('height', '4.8'); pernaEsq.setAttribute('depth', '1.2'); pernaEsq.setAttribute('color', '#080810'); totemArcade.appendChild(pernaEsq);
+                        var pernaDir = document.createElement('a-box'); pernaDir.setAttribute('position', '1.45 2.4 0.4'); pernaDir.setAttribute('width', '0.1'); pernaDir.setAttribute('height', '4.8'); pernaDir.setAttribute('depth', '1.2'); pernaDir.setAttribute('color', '#080810'); totemArcade.appendChild(pernaDir);
 
-                        var pernaDir = document.createElement('a-box');
-                        pernaDir.setAttribute('position', '1.45 2.4 0.4');
-                        pernaDir.setAttribute('width', '0.1'); pernaDir.setAttribute('height', '4.8'); pernaDir.setAttribute('depth', '1.2');
-                        pernaDir.setAttribute('color', '#080810');
-                        totemArcade.appendChild(pernaDir);
-
-                        var painelMeio = document.createElement('a-plane');
-                        painelMeio.setAttribute('position', '0 3.0 0.2');
-                        painelMeio.setAttribute('width', '2.8'); painelMeio.setAttribute('height', '2.1');
-                        painelMeio.setAttribute('material', 'shader: flat; color: #1a1a33');
+                        var painelMeio = document.createElement('a-plane'); painelMeio.setAttribute('position', '0 3.0 0.2'); painelMeio.setAttribute('width', '2.8'); painelMeio.setAttribute('height', '2.1'); painelMeio.setAttribute('material', 'shader: flat; color: #1a1a33');
+                        var areaVideo = document.createElement('a-plane'); areaVideo.setAttribute('position', '0 0.35 0.01'); areaVideo.setAttribute('width', '2.4'); areaVideo.setAttribute('height', '1.35'); areaVideo.setAttribute('color', '#000000'); painelMeio.appendChild(areaVideo);
                         
-                        var areaVideo = document.createElement('a-plane');
-                        areaVideo.setAttribute('position', '0 0.35 0.01');
-                        areaVideo.setAttribute('width', '2.4'); areaVideo.setAttribute('height', '1.35');
-                        areaVideo.setAttribute('color', '#000000');
-                        painelMeio.appendChild(areaVideo);
-                        
-                        // TEXTO VIDEO TROIKA
-                        var textoVideo = document.createElement('a-entity');
-                        textoVideo.setAttribute('troika-text', 'value: [ ESPAÇO PARA VÍDEO ]; color: #444444; align: center; fontSize: 0.15');
-                        textoVideo.setAttribute('position', '0 0 0.02');
-                        areaVideo.appendChild(textoVideo);
+                        var textoVideo = document.createElement('a-entity'); textoVideo.setAttribute('troika-text', 'value: [ ESPAÇO PARA VÍDEO ]; color: #444444; align: center; fontSize: 0.15'); textoVideo.setAttribute('position', '0 0 0.02'); areaVideo.appendChild(textoVideo);
+                        var textoMeio = document.createElement('a-entity'); textoMeio.setAttribute('troika-text', 'value: Resumo histórico e principais inovações da ' + conteudo.sala + '...\n(Texto dinâmico do carrossel); color: #00fff2; align: center; fontSize: 0.1; maxWidth: 2.5; lineHeight: 1.2'); textoMeio.setAttribute('position', '0 -0.6 0.01'); painelMeio.appendChild(textoMeio); totemArcade.appendChild(painelMeio);
 
-                        // TEXTO MEIO TROIKA
-                        var textoMeio = document.createElement('a-entity');
-                        textoMeio.setAttribute('troika-text', 'value: Resumo histórico e principais inovações da ' + conteudo.sala + '...\n(Texto dinâmico do carrossel); color: #00fff2; align: center; fontSize: 0.1; maxWidth: 2.5; lineHeight: 1.2');
-                        textoMeio.setAttribute('position', '0 -0.6 0.01');
-                        painelMeio.appendChild(textoMeio);
-                        totemArcade.appendChild(painelMeio);
+                        var painelCima = document.createElement('a-plane'); painelCima.setAttribute('position', '0 4.396 0.4'); painelCima.setAttribute('rotation', '30 0 0'); painelCima.setAttribute('width', '2.8'); painelCima.setAttribute('height', '0.8'); painelCima.setAttribute('material', 'shader: flat; color: ' + corNeon); 
+                        var textoCima = document.createElement('a-entity'); textoCima.setAttribute('troika-text', 'value: ' + conteudo.sala.toUpperCase() + '\n( ' + conteudo.ano + ' ); color: #05010f; align: center; fontSize: 0.22; maxWidth: 2.6'); textoCima.setAttribute('position', '0 0 0.01'); painelCima.appendChild(textoCima); totemArcade.appendChild(painelCima);
 
-                        var painelCima = document.createElement('a-plane');
-                        painelCima.setAttribute('position', '0 4.396 0.4');
-                        painelCima.setAttribute('rotation', '30 0 0');
-                        painelCima.setAttribute('width', '2.8'); painelCima.setAttribute('height', '0.8');
-                        painelCima.setAttribute('material', 'shader: flat; color: ' + corNeon); 
-                        
-                        // TEXTO MARQUEE TROIKA
-                        var textoCima = document.createElement('a-entity');
-                        textoCima.setAttribute('troika-text', 'value: ' + conteudo.sala.toUpperCase() + '\n( ' + conteudo.ano + ' ); color: #05010f; align: center; fontSize: 0.22; maxWidth: 2.6');
-                        textoCima.setAttribute('position', '0 0 0.01');
-                        painelCima.appendChild(textoCima);
-                        totemArcade.appendChild(painelCima);
+                        var painelBaixo = document.createElement('a-plane'); painelBaixo.setAttribute('position', '0 1.596 0.554'); painelBaixo.setAttribute('rotation', '-45 0 0'); painelBaixo.setAttribute('width', '2.8'); painelBaixo.setAttribute('height', '1.0'); painelBaixo.setAttribute('color', '#080810'); 
+                        var detalheMesa = document.createElement('a-plane'); detalheMesa.setAttribute('position', '0 0 0.01'); detalheMesa.setAttribute('width', '2.7'); detalheMesa.setAttribute('height', '0.9'); detalheMesa.setAttribute('material', 'shader: flat; color: ' + corNeon); painelBaixo.appendChild(detalheMesa);
+                        var fundoMesa = document.createElement('a-plane'); fundoMesa.setAttribute('position', '0 0 0.02'); fundoMesa.setAttribute('width', '2.6'); fundoMesa.setAttribute('height', '0.8'); fundoMesa.setAttribute('color', '#05010f'); painelBaixo.appendChild(fundoMesa);
 
-                        var painelBaixo = document.createElement('a-plane');
-                        painelBaixo.setAttribute('position', '0 1.596 0.554');
-                        painelBaixo.setAttribute('rotation', '-45 0 0');
-                        painelBaixo.setAttribute('width', '2.8'); painelBaixo.setAttribute('height', '1.0');
-                        painelBaixo.setAttribute('color', '#080810'); 
-                        
-                        var detalheMesa = document.createElement('a-plane');
-                        detalheMesa.setAttribute('position', '0 0 0.01');
-                        detalheMesa.setAttribute('width', '2.7'); detalheMesa.setAttribute('height', '0.9');
-                        detalheMesa.setAttribute('material', 'shader: flat; color: ' + corNeon); 
-                        painelBaixo.appendChild(detalheMesa);
-                        
-                        var fundoMesa = document.createElement('a-plane');
-                        fundoMesa.setAttribute('position', '0 0 0.02');
-                        fundoMesa.setAttribute('width', '2.6'); fundoMesa.setAttribute('height', '0.8');
-                        fundoMesa.setAttribute('color', '#05010f'); 
-                        painelBaixo.appendChild(fundoMesa);
-
-                        var btnPrev = document.createElement('a-circle');
-                        btnPrev.setAttribute('position', '-0.6 0 0.03'); btnPrev.setAttribute('radius', '0.15'); btnPrev.setAttribute('color', '#0a0a15');
-                        var ringPrev = document.createElement('a-ring');
-                        ringPrev.setAttribute('radius-inner', '0.13'); ringPrev.setAttribute('radius-outer', '0.15'); ringPrev.setAttribute('position', '0 0 0.01');
-                        ringPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnPrev.appendChild(ringPrev);
-                        var iconPrev = document.createElement('a-triangle');
-                        iconPrev.setAttribute('vertex-a', '0 0.07 0'); iconPrev.setAttribute('vertex-b', '-0.07 -0.07 0'); iconPrev.setAttribute('vertex-c', '0.07 -0.07 0');
-                        iconPrev.setAttribute('rotation', '0 0 90'); iconPrev.setAttribute('position', '-0.02 0 0.02'); iconPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnPrev.appendChild(iconPrev);
-                        var barPrev = document.createElement('a-plane');
-                        barPrev.setAttribute('width', '0.04'); barPrev.setAttribute('height', '0.14'); barPrev.setAttribute('position', '-0.08 0 0.02'); barPrev.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnPrev.appendChild(barPrev);
-                        painelBaixo.appendChild(btnPrev);
-
-                        var btnPlay = document.createElement('a-circle');
-                        btnPlay.setAttribute('position', '0 0 0.03'); btnPlay.setAttribute('radius', '0.15'); btnPlay.setAttribute('color', '#0a0a15');
-                        var ringPlay = document.createElement('a-ring');
-                        ringPlay.setAttribute('radius-inner', '0.13'); ringPlay.setAttribute('radius-outer', '0.15'); ringPlay.setAttribute('position', '0 0 0.01');
-                        ringPlay.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnPlay.appendChild(ringPlay);
-                        var iconPlay = document.createElement('a-triangle');
-                        iconPlay.setAttribute('vertex-a', '0 0.07 0'); iconPlay.setAttribute('vertex-b', '-0.07 -0.07 0'); iconPlay.setAttribute('vertex-c', '0.07 -0.07 0');
-                        iconPlay.setAttribute('rotation', '0 0 -90'); iconPlay.setAttribute('position', '0.02 0 0.02'); iconPlay.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnPlay.appendChild(iconPlay);
-                        painelBaixo.appendChild(btnPlay);
-
-                        var btnNext = document.createElement('a-circle');
-                        btnNext.setAttribute('position', '0.6 0 0.03'); btnNext.setAttribute('radius', '0.15'); btnNext.setAttribute('color', '#0a0a15');
-                        var ringNext = document.createElement('a-ring');
-                        ringNext.setAttribute('radius-inner', '0.13'); ringNext.setAttribute('radius-outer', '0.15'); ringNext.setAttribute('position', '0 0 0.01');
-                        ringNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnNext.appendChild(ringNext);
-                        var iconNext = document.createElement('a-triangle');
-                        iconNext.setAttribute('vertex-a', '0 0.07 0'); iconNext.setAttribute('vertex-b', '-0.07 -0.07 0'); iconNext.setAttribute('vertex-c', '0.07 -0.07 0');
-                        iconNext.setAttribute('rotation', '0 0 -90'); iconNext.setAttribute('position', '0.02 0 0.02'); iconNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnNext.appendChild(iconNext);
-                        var barNext = document.createElement('a-plane');
-                        barNext.setAttribute('width', '0.04'); barNext.setAttribute('height', '0.14'); barNext.setAttribute('position', '0.08 0 0.02'); barNext.setAttribute('material', 'shader: flat; color: ' + corNeon);
-                        btnNext.appendChild(barNext);
-                        painelBaixo.appendChild(btnNext);
+                        var btnProps = [ {x: -0.6, rot: 90}, {x: 0, rot: -90}, {x: 0.6, rot: -90} ];
+                        btnProps.forEach(function(bp) {
+                            var btn = document.createElement('a-circle'); btn.setAttribute('position', bp.x + ' 0 0.03'); btn.setAttribute('radius', '0.15'); btn.setAttribute('color', '#0a0a15');
+                            var ring = document.createElement('a-ring'); ring.setAttribute('radius-inner', '0.13'); ring.setAttribute('radius-outer', '0.15'); ring.setAttribute('position', '0 0 0.01'); ring.setAttribute('material', 'shader: flat; color: ' + corNeon); btn.appendChild(ring);
+                            var icon = document.createElement('a-triangle'); icon.setAttribute('vertex-a', '0 0.07 0'); icon.setAttribute('vertex-b', '-0.07 -0.07 0'); icon.setAttribute('vertex-c', '0.07 -0.07 0'); icon.setAttribute('rotation', '0 0 ' + bp.rot); icon.setAttribute('position', (bp.rot > 0 ? '-0.02' : '0.02') + ' 0 0.02'); icon.setAttribute('material', 'shader: flat; color: ' + corNeon); btn.appendChild(icon);
+                            painelBaixo.appendChild(btn);
+                        });
                         
                         totemArcade.appendChild(painelBaixo);
-                        ala.appendChild(totemArcade);
+                        grupoCont.appendChild(totemArcade);
                     }
 
+                    ala.appendChild(grupoCont);
+
+                    // SALVANDO REFERÊNCIAS PARA A LÓGICA DO JOGO
+                    this.totensCores.push({ 
+                        anel: anelBaseTotem, faixa: faixaTotem, btn: botaoFisico, 
+                        pisoCirc: exedraChao, bordaPlat: bordaPlataforma, linhaC: linhaCentro, listra: listraNeon,
+                        conteudoEntity: grupoCont, 
+                        corOriginal: corNeon 
+                    });
+
                     centro.appendChild(ala);
+                }
+
+                this.construirTerminalCentral();
+            },
+
+            // ==========================================
+            // TERMINAL CENTRAL (Holográfico com Teclado)
+            // ==========================================
+            construirTerminalCentral: function() {
+                var self = this;
+                var baseCentral = document.querySelector('#monumento-cilindro'); 
+                
+                var painelTerm = document.createElement('a-entity');
+                // Posicionado mais abaixo (Y=0.8) para evitar o cubo giratório
+                painelTerm.setAttribute('position', '0 0.8 0.36'); 
+                
+                var fundo = document.createElement('a-plane');
+                fundo.setAttribute('width', '0.6'); fundo.setAttribute('height', '0.8'); fundo.setAttribute('color', '#080810');
+                painelTerm.appendChild(fundo);
+
+                var display = document.createElement('a-plane');
+                display.setAttribute('position', '0 0.25 0.01'); display.setAttribute('width', '0.5'); display.setAttribute('height', '0.15'); display.setAttribute('color', '#000000');
+                this.textoDisplay = document.createElement('a-entity');
+                this.textoDisplay.setAttribute('troika-text', 'value: SENHA ' + (this.terminalStep + 1) + ':\n_ _ _; color: #00fff2; align: left; fontSize: 0.05');
+                this.textoDisplay.setAttribute('position', '-0.22 0 0.01');
+                display.appendChild(this.textoDisplay);
+                painelTerm.appendChild(display);
+
+                var botoesInfo = [
+                    { t: '1', x: -0.15, y: 0.05 }, { t: '2', x: 0, y: 0.05 }, { t: '3', x: 0.15, y: 0.05 },
+                    { t: '4', x: -0.15, y: -0.1 }, { t: '5', x: 0, y: -0.1 }, { t: '6', x: 0.15, y: -0.1 },
+                    { t: '7', x: -0.15, y: -0.25 }, { t: '8', x: 0, y: -0.25 }, { t: '9', x: 0.15, y: -0.25 },
+                    { t: 'C', x: -0.15, y: -0.4, c: '#ff2d55' }, { t: '0', x: 0, y: -0.4 }, { t: 'V', x: 0.15, y: -0.4, c: '#39ff14' }
+                ];
+
+                botoesInfo.forEach(function(b) {
+                    var btnBox = document.createElement('a-box');
+                    btnBox.setAttribute('position', b.x + ' ' + b.y + ' 0.01'); btnBox.setAttribute('width', '0.1'); btnBox.setAttribute('height', '0.1'); btnBox.setAttribute('depth', '0.02'); btnBox.setAttribute('color', '#12121f');
+                    btnBox.classList.add('interactable'); 
+
+                    var textBtn = document.createElement('a-entity');
+                    var corT = b.c ? b.c : '#ffffff';
+                    textBtn.setAttribute('troika-text', 'value: ' + b.t + '; color: ' + corT + '; align: center; fontSize: 0.06');
+                    textBtn.setAttribute('position', '0 0 0.015'); btnBox.appendChild(textBtn);
+
+                    btnBox.addEventListener('click', function() { self.cliqueTerminal(b.t); });
+                    painelTerm.appendChild(btnBox);
+                });
+
+                baseCentral.appendChild(painelTerm);
+            },
+
+            // ==========================================
+            // LÓGICA DO PUZZLE LIGHTS OUT & TELEPORTE
+            // ==========================================
+            processarLightsOut: function(indexApertado) {
+                // Se o jogo já foi resolvido, o botão atua como Teletransporte rápido
+                if (this.terminalStep >= 4) {
+                    // Cálculo de rotação em A-Frame (Regra da Mão Esquerda/Direita)
+                    var anguloAlaRad = indexApertado * 36 * (Math.PI / 180);
+                    var raioTeleporte = 16.0; 
+                    var tX = -raioTeleporte * Math.sin(anguloAlaRad);
+                    var tZ = -raioTeleporte * Math.cos(anguloAlaRad);
+                    
+                    var rig = document.querySelector('#rig');
+                    rig.setAttribute('animation', 'property: position; to: ' + tX.toFixed(3) + ' 1.6 ' + tZ.toFixed(3) + '; dur: 1000; easing: easeInOutQuad');
+                    return;
+                }
+
+                // Lógica de Vizinhança
+                var esq = (indexApertado - 1 + 10) % 10;
+                var dir = (indexApertado + 1) % 10;
+                
+                this.inverterEstado(esq);
+                this.inverterEstado(indexApertado);
+                this.inverterEstado(dir);
+            },
+
+            inverterEstado: function(idx) {
+                this.lightsOutState[idx] = !this.lightsOutState[idx];
+                this.aplicarEstadoVisual(idx, this.lightsOutState[idx]);
+            },
+
+            aplicarEstadoVisual: function(idx, ligado) {
+                var props = this.totensCores[idx];
+                var corAplicar = ligado ? props.corOriginal : this.corApagada;
+                
+                // Atualiza cores dinâmicas
+                props.anel.setAttribute('material', 'color', corAplicar);
+                props.faixa.setAttribute('material', 'color', corAplicar);
+                props.btn.setAttribute('material', 'color', corAplicar);
+
+                props.pisoCirc.setAttribute('piso-neon', 'cor', corAplicar); 
+                props.bordaPlat.setAttribute('material', 'color', corAplicar);
+                props.linhaC.setAttribute('material', 'color', corAplicar);
+                props.listra.setAttribute('material', 'color', corAplicar);
+
+                var acessoTotal = this.terminalStep >= 4;
+
+                // Anima as Salas
+                if(ligado) {
+                    if(acessoTotal) {
+                        this.arquiteturas[idx].setAttribute('animation', 'property: scale; to: 1 1 1; dur: 2000; easing: easeOutElastic');
+                    }
+                    if(props.conteudoEntity) {
+                        props.conteudoEntity.setAttribute('animation', 'property: scale; to: 1 1 1; dur: 800; easing: easeOutElastic');
+                    }
+                } else {
+                    this.arquiteturas[idx].setAttribute('animation', 'property: scale; to: 0 0 0; dur: 1000; easing: easeInQuad');
+                    if(props.conteudoEntity) {
+                        props.conteudoEntity.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 400; easing: easeInQuad');
+                    }
+                }
+            },
+
+            // ==========================================
+            // LÓGICA DO TECLADO E VITÓRIA
+            // ==========================================
+            cliqueTerminal: function(tecla) {
+                // Modo Acesso Total: O Botão C Reinicia o Jogo Inteiro
+                if(this.terminalStep >= 4) {
+                    if(tecla === 'C') {
+                        this.resetJogo();
+                    }
+                    return; 
+                }
+
+                if(tecla === 'C') {
+                    this.inputAtual = "";
+                } else if(tecla === 'V') {
+                    if(this.inputAtual === this.senhas[this.terminalStep]) {
+                        // ACERTOU! Acende o anel da cúpula correspondente.
+                        this.aneisCupula[this.terminalStep].setAttribute('material', 'color', this.corCoroa);
+                        this.terminalStep++;
+                        this.inputAtual = "";
+                        
+                        if(this.terminalStep === 4) {
+                            // VITÓRIA FINAL
+                            this.textoDisplay.setAttribute('troika-text', 'value: ACESSO TOTAL!\nSISTEMA ONLINE\n[ C ] P/ REINICIAR; color: #39ff14; align: center; fontSize: 0.04');
+                            this.textoDisplay.setAttribute('position', '0 0 0.01');
+                            
+                            // Força acendimento de todas as luzes e de todas as arquiteturas
+                            for(var a = 0; a < 10; a++) {
+                                this.lightsOutState[a] = true;
+                                this.aplicarEstadoVisual(a, true);
+                            }
+                        }
+                    } else {
+                        // ERROU
+                        this.inputAtual = "";
+                        this.textoDisplay.setAttribute('troika-text', 'value: ERRO!; color: #ff2d55');
+                        var self = this;
+                        setTimeout(function(){ self.atualizarDisplay(); }, 1000);
+                        return;
+                    }
+                } else {
+                    if(this.inputAtual.length < 5) this.inputAtual += tecla;
+                }
+                this.atualizarDisplay();
+            },
+
+            atualizarDisplay: function() {
+                if(this.terminalStep < 4) {
+                    var displayVis = this.inputAtual.length > 0 ? this.inputAtual : '_ _ _';
+                    this.textoDisplay.setAttribute('troika-text', 'value: SENHA ' + (this.terminalStep + 1) + ':\n' + displayVis + '; color: #00fff2; align: left; fontSize: 0.05');
+                    this.textoDisplay.setAttribute('position', '-0.22 0 0.01');
+                }
+            },
+
+            resetJogo: function() {
+                this.terminalStep = 0;
+                this.inputAtual = "";
+                this.atualizarDisplay();
+                
+                // Apaga Anéis do Teto
+                for(var r = 0; r < 4; r++) {
+                    this.aneisCupula[r].setAttribute('material', 'color', this.corApagada);
+                }
+
+                // Apaga e recolhe tudo
+                for(var a = 0; a < 10; a++) {
+                    this.lightsOutState[a] = false;
+                    this.aplicarEstadoVisual(a, false);
                 }
             }
         });
@@ -623,7 +759,7 @@
         <a-entity position="0 0 0">
             <a-cylinder position="0 0.25 0" radius="3.2" height="0.5" color="#0c0c18"></a-cylinder>
             <a-torus position="0 0.5 0" rotation="90 0 0" radius="3.2" radius-tubular="0.05" material="shader: flat; color: #00fff2"></a-torus>
-            <a-cylinder position="0 1.8 0" radius="0.35" height="2.6" color="#12121f"></a-cylinder>
+            <a-cylinder id="monumento-cilindro" position="0 1.8 0" radius="0.35" height="2.6" color="#12121f"></a-cylinder>
             <a-entity position="0 3.6 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 14000; easing: linear">
                 <a-box width="0.9" height="0.9" depth="0.9" material="shader: flat; color: #ff00a0"></a-box>
                 <a-torus radius="1.1" radius-tubular="0.04" rotation="70 0 0" material="shader: flat; color: #00fff2"></a-torus>
@@ -632,19 +768,12 @@
 
         <a-entity position="0 16 0">
             <a-box width="5.8" height="4.5" depth="5.8" color="#080810"></a-box>
-            
-            <a-cylinder position="-2.8 12 -2.8" radius="0.05" height="24" color="#111"></a-cylinder>
-            <a-cylinder position="2.8 12 -2.8" radius="0.05" height="24" color="#111"></a-cylinder>
-            <a-cylinder position="-2.8 12 2.8" radius="0.05" height="24" color="#111"></a-cylinder>
-            <a-cylinder position="2.8 12 2.8" radius="0.05" height="24" color="#111"></a-cylinder>
 
             <a-entity position="0 0 3.5" rotation="10 0 0">
                 <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
                     <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
                     <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
-                    
                     <a-entity troika-text="value: CONHECIMENTO, APRENDIZADO E DIVERSÃO; color: #05010f; align: center; fontSize: 0.18; maxWidth: 5" position="0 -1.4 0.02"></a-entity>
-                    
                     <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                     <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                 </a-plane>
@@ -654,9 +783,7 @@
                 <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
                     <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
                     <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
-                    
                     <a-entity troika-text="value: CONHECIMENTO, APRENDIZADO E DIVERSÃO; color: #05010f; align: center; fontSize: 0.18; maxWidth: 5" position="0 -1.4 0.02"></a-entity>
-
                     <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                     <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                 </a-plane>
@@ -666,9 +793,7 @@
                 <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
                     <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
                     <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
-                    
                     <a-entity troika-text="value: DIVULGANDO A CIÊNCIA POR MEIO DOS JOGOS; color: #05010f; align: center; fontSize: 0.18; maxWidth: 5" position="0 -1.4 0.02"></a-entity>
-
                     <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                     <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                 </a-plane>
@@ -678,9 +803,7 @@
                 <a-plane width="6" height="4.5" material="shader: flat; color: #ffffff">
                     <a-plane position="0 0 -0.01" width="6.2" height="4.7" material="shader: flat; color: #ffee00"></a-plane>
                     <a-image src="#logo-mgc" position="0 0.4 0.02" width="4.5" height="2.25" transparent="true"></a-image>
-                    
                     <a-entity troika-text="value: DIVULGANDO A CIÊNCIA POR MEIO DOS JOGOS; color: #05010f; align: center; fontSize: 0.18; maxWidth: 5" position="0 -1.4 0.02"></a-entity>
-
                     <a-plane position="0 1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                     <a-plane position="0 -1.8 0.02" width="5.4" height="0.08" color="#ffee00"></a-plane>
                 </a-plane>
@@ -692,10 +815,10 @@
 
         <a-entity id="rig" position="0 1.6 8" movement-controls="speed: 0.25">
             <a-camera id="camera-jogador" look-controls>
-                <a-cursor color="#00fff2" fuse="false"></a-cursor>
+                <a-cursor color="#00fff2" fuse="false" raycaster="objects: .interactable"></a-cursor>
             </a-camera>
-            <a-entity laser-controls="hand: left" raycaster="far: 10" line="color: #00fff2; opacity: 0.6"></a-entity>
-            <a-entity laser-controls="hand: right" raycaster="far: 10" line="color: #ff00a0; opacity: 0.6"></a-entity>
+            <a-entity laser-controls="hand: left" raycaster="objects: .interactable; far: 10" line="color: #00fff2; opacity: 0.6"></a-entity>
+            <a-entity laser-controls="hand: right" raycaster="objects: .interactable; far: 10" line="color: #ff00a0; opacity: 0.6"></a-entity>
         </a-entity>
 
     </a-scene>
